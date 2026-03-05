@@ -55,6 +55,13 @@ from{opacity:1}
 to{opacity:0.4}
 }
 
+input{
+padding:8px;
+margin:5px;
+border-radius:6px;
+border:none;
+}
+
 </style>
 
 </head>
@@ -70,7 +77,9 @@ Players (including dealer):
 
 <br><br>
 
-<button onclick="startGame()">Start Game</button>
+<button onclick="generateNameInputs()">Next</button>
+
+<div id="nameInputs"></div>
 
 </div>
 
@@ -124,8 +133,34 @@ Confirm Pass
 
 let deck=[]
 let players=[]
+let playerNames=[]
 let currentPlayer=0
 let dealerIndex=0
+
+
+
+function generateNameInputs(){
+
+let count=parseInt(document.getElementById("playerCount").value)
+
+if(count<2){
+alert("Need at least 2 players")
+return
+}
+
+let html="<h3>Enter Player Names</h3>"
+
+for(let i=0;i<count;i++){
+
+html+=`<input id="name${i}" placeholder="Player ${i+1}"><br>`
+
+}
+
+html+=`<br><button onclick="startGame()">Start Game</button>`
+
+document.getElementById("nameInputs").innerHTML=html
+
+}
 
 
 
@@ -170,17 +205,19 @@ function startGame(){
 
 let count=parseInt(document.getElementById("playerCount").value)
 
-if(count<2){
-alert("Need at least 2 players")
-return
-}
-
 createDeck()
 shuffle()
 
 players=[]
+playerNames=[]
 
 for(let i=0;i<count;i++){
+
+let name=document.getElementById("name"+i).value
+
+if(name=="") name="Player "+(i+1)
+
+playerNames.push(name)
 
 players.push({
 cards:[],
@@ -212,8 +249,9 @@ function showPlayer(){
 
 let player=players[currentPlayer]
 
-document.getElementById("playerTitle").innerText=
-(currentPlayer==dealerIndex?"Dealer":"Player "+(currentPlayer+1))
+let name=playerNames[currentPlayer]
+
+document.getElementById("playerTitle").innerText=name+"'s Turn"
 
 displayCards(player.cards)
 
@@ -374,38 +412,27 @@ let cardCount=cards.length
 for(let card of cards){
 
 if(card.value=="A"){
-
 aces++
-
 }
 
 else if(["K","Q","J"].includes(card.value)){
-
 total+=10
-
 }
 
 else{
-
 total+=parseInt(card.value)
-
 }
 
 }
-
 
 if(aces==0) return total
-
 
 let possibleScores=[]
 
 if(cardCount==2){
 
 for(let i=0;i<=aces;i++){
-
-let score=total+(aces-i)*11+i
-possibleScores.push(score)
-
+possibleScores.push(total+(aces-i)*11+i)
 }
 
 }
@@ -413,10 +440,7 @@ possibleScores.push(score)
 else if(cardCount==3){
 
 for(let i=0;i<=aces;i++){
-
-let score=total+(aces-i)*10+i
-possibleScores.push(score)
-
+possibleScores.push(total+(aces-i)*10+i)
 }
 
 }
@@ -427,21 +451,16 @@ possibleScores.push(total+aces)
 
 }
 
-
 let best=0
 
 for(let s of possibleScores){
-
 if(s<=21 && s>best){
 best=s
 }
-
 }
 
 if(best==0){
-
 best=Math.min(...possibleScores)
-
 }
 
 return best
@@ -465,7 +484,7 @@ let p=players[i]
 
 let score=calculateScore(p.cards)
 
-html+="<h3>"+(i==dealerIndex?"Dealer":"Player "+(i+1))+"</h3>"
+html+="<h3>"+playerNames[i]+"</h3>"
 
 for(let card of p.cards){
 
@@ -491,7 +510,7 @@ html+="<br>Score: "+score+"<br><br>"
 if(score<=21 && score>bestScore){
 
 bestScore=score
-winner=(i==dealerIndex?"Dealer":"Player "+(i+1))
+winner=playerNames[i]
 
 }
 
