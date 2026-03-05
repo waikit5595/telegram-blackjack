@@ -265,7 +265,7 @@ document.getElementById("hitBtn").disabled=false
 
 document.getElementById("blackjackMsg").innerHTML=""
 
-checkBlackjack()
+checkBlackjackOrPairLock()
 
 }
 
@@ -303,14 +303,36 @@ document.getElementById("cards").innerHTML=html
 
 
 
-function checkBlackjack(){
+// ✅ 新规则函数：Blackjack 或 高对子锁牌
+
+function checkBlackjackOrPairLock(){
 
 let player=players[currentPlayer]
+let cards=player.cards
 
-if(player.cards.length==2){
+if(cards.length==2){
 
-let score=calculateScore(player.cards)
+let score=calculateScore(cards)
 
+let v1=cards[0].value
+let v2=cards[1].value
+
+// 高对子锁牌
+let pairValues=["8","9","10","J","Q","K","A"]
+
+if(v1==v2 && pairValues.includes(v1)){
+
+document.getElementById("blackjackMsg").innerHTML=
+'<div class="blackjack">PAIR LOCK ('+v1+','+v2+')</div>'
+
+document.getElementById("hitBtn").disabled=true
+
+stand()
+
+return
+}
+
+// Blackjack
 if(score==21){
 
 player.blackjack=true
