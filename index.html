@@ -53,187 +53,51 @@ function blackjack(hand){if(hand.length!=2) return false;let r1=hand[0].rank,r2=
 function strongPair(hand){if(hand.length!=2) return false;if(hand[0].rank!=hand[1].rank) return false;return value(hand[0].rank)>=8;}
 
 // ---------- 房间操作 ----------
-function createRoom(){
-    username=document.getElementById("nameInput").value.trim()||"Host";
-    roomID="room"+Math.floor(Math.random()*9999);
-
-    db.ref("rooms/"+roomID).set({
-        host:userID,
-        started:false,
-        currentTurn:0,
-        reveal:false,
-        deck:createDeck(),
-        players:{
-            [userID]:{name:username,hand:[],stand:false}
-        }
-    }).then(()=>{
-        listenRoom();
-    }).catch(err=>alert("房间创建失败: "+err));
-}
-
-function joinRoom(){
-    username=document.getElementById("nameInput").value.trim()||"Player";
-    roomID=document.getElementById("roomInput").value.trim();
-    if(!roomID){alert("请输入房间ID"); return;}
-    db.ref("rooms/"+roomID+"/players").once("value").then(snap=>{
-        let count = snap.exists() ? Object.keys(snap.val()).length : 0;
-        if(count>=10){alert("房间已满（最多10人）"); return;}
-        db.ref("rooms/"+roomID+"/players/"+userID).set({name:username,hand:[],stand:false});
-        listenRoom();
-    }).catch(err=>alert("加入失败: "+err));
-}
+function createRoom(){username=document.getElementById("nameInput").value.trim()||"Host";roomID="room"+Math.floor(Math.random()*9999);db.ref("rooms/"+roomID).set({host:userID,started:false,currentTurn:0,reveal:false,deck:createDeck(),players:{[userID]:{name:username,hand:[],stand:false}}});listenRoom();}
+function joinRoom(){username=document.getElementById("nameInput").value.trim()||"Player";roomID=document.getElementById("roomInput").value.trim();if(!roomID){alert("请输入房间ID"); return;}db.ref("rooms/"+roomID+"/players/"+userID).set({name:username,hand:[],stand:false});listenRoom();}
 
 // ---------- 监听房间 ----------
-function listenRoom(){
-    db.ref("rooms/"+roomID).on("value", snap=>{
-        let data = snap.val();
-        if(!data) return;
-        let count = Object.keys(data.players).length;
-        document.getElementById("roomInfo").innerHTML=`Room: ${roomID} | 玩家人数: ${count}/10`;
-        renderPlayers(data);
+function listenRoom(){db.ref("rooms/"+roomID).on("value", snap=>{let data=snap.val();if(!data) return;document.getElementById("roomInfo").innerHTML=`Room: ${roomID}`;renderPlayers(data);
 
-        if(!data.started && data.host==userID){
-            document.getElementById("controls").innerHTML=
-                `<button onclick="startGame()">Start Game</button>`;
-        }
+// 房主未开始显示Start
+if(!data.started && data.host==userID){let count=Object.keys(data.players).length;document.getElementById("controls").innerHTML=`<div>玩家人数: ${count} (房主可开始游戏)</div><button onclick="startGame()">Start Game</button>`;}
 
-        if(data.started){
-            // 自动 Reveal 条件: 任何玩家 Blackjack 或对子>=8
-            let autoReveal=false;
-            Object.keys(data.players).forEach(pid=>{
-                if(blackjack(data.players[pid].hand)||strongPair(data.players[pid].hand)) autoReveal=true;
-            });
-            if(autoReveal && !data.reveal){
-                db.ref("rooms/"+roomID).update({reveal:true});
-                Object.keys(data.players).forEach(pid=>{data.players[pid].stand=true;});
-                db.ref("rooms/"+roomID+"/players").update(data.players);
-            }
-
-            renderGame(data);
-            renderControls(data);
-        }
+// 游戏开始
+if(data.started){
+    // 检查是否有玩家达到自动Reveal条件
+    let autoReveal=false;
+    Object.keys(data.players).forEach(pid=>{
+        if(blackjack(data.players[pid].hand)||strongPair(data.players[pid].hand)) autoReveal=true;
     });
-}
+    if(autoReveal){
+        db.ref("rooms/"+roomID).update({reveal:true});
+        Object.keys(data.players).forEach(pid=>{data.players[pid].stand=true;});
+        db.ref("rooms/"+roomID+"/players").update(data.players);
+    }
+    renderGame(data);renderControls(data);
+}});}
 
 // ---------- 开始游戏 ----------
-function startGame(){
-    db.ref("rooms/"+roomID).once("value").then(snap=>{
-        let data = snap.val();
-        let deck = data.deck;
-        let players = data.players;
-        let ids = Object.keys(players);
+function startGame(){let ref=db.ref("rooms/"+roomID);ref.once("value").then(snap=>{let data=snap.val();let deck=data.deck;let players=data.players;let ids=Object.keys(players);
 
-        if(ids.length<2){alert("至少需要2名玩家才能开始游戏"); return;}
-
-        // 发牌给非庄家玩家
-        for(let i=0;i<ids.length;i++){
-            let id = ids[i];
-            if(id==data.host) continue;
-            players[id].hand = [deck.pop(),deck.pop()];
-            players[id].stand=false;
-        }
-
-        // 庄家（房主）最后抽牌
-        players[data.host].hand=[];
-        players[data.host].stand=false;
-
-        db.ref("rooms/"+roomID).update({
-            players:players,
-            deck:deck,
-            started:true,
-            currentTurn:0,
-            reveal:false
-        });
-    });
-}
+// 先给非庄家两张牌
+for(let i=0;i<ids.length-1;i++){let id=ids[i];players[id].hand=[deck.pop(),deck.pop()];players[id].stand=false;}
+// 庄家最后发两张牌
+let dealerID=data.host;players[dealerID].hand=[];players[dealerID].stand=false;
+ref.update({players:players,deck:deck,started:true,currentTurn:0,reveal:false});});}
 
 // ---------- 玩家操作 ----------
-function hit(){
-    db.ref("rooms/"+roomID).once("value").then(snap=>{
-        let data=snap.val();
-        let deck = data.deck;
-        let players = data.players;
-        players[userID].hand.push(deck.pop());
-        db.ref("rooms/"+roomID).update({players:players,deck:deck});
-    });
-}
+function hit(){let ref=db.ref("rooms/"+roomID);ref.once("value").then(snap=>{let data=snap.val();let deck=data.deck;let players=data.players;players[userID].hand.push(deck.pop());ref.update({players:players,deck:deck});});}
+function stand(){let ref=db.ref("rooms/"+roomID);ref.once("value").then(snap=>{let data=snap.val();data.players[userID].stand=true;let ids=Object.keys(data.players);let nextIndex=data.currentTurn+1;let dealerID=data.host;if(nextIndex>=ids.length-1) nextIndex=ids.indexOf(dealerID);ref.update({players:data.players,currentTurn:nextIndex});});}
 
-function stand(){
-    db.ref("rooms/"+roomID).once("value").then(snap=>{
-        let data = snap.val();
-        data.players[userID].stand=true;
-
-        let ids = Object.keys(data.players);
-        let nextIndex = data.currentTurn+1;
-        let dealerID = data.host;
-        if(nextIndex>=ids.length-1) nextIndex=ids.indexOf(dealerID);
-
-        db.ref("rooms/"+roomID).update({players:data.players,currentTurn:nextIndex});
-    });
-}
-
-// ---------- Reveal & Reset ----------
+// ---------- Reveal / 下一局 ----------
 function reveal(){db.ref("rooms/"+roomID).update({reveal:true});}
-function resetGame(){
-    db.ref("rooms/"+roomID).once("value").then(snap=>{
-        let data = snap.val();
-        let deck = createDeck();
-        let players = data.players;
-        Object.keys(players).forEach(id=>{players[id].hand=[];players[id].stand=false;});
-        db.ref("rooms/"+roomID).update({
-            deck:deck,
-            players:players,
-            started:false,
-            currentTurn:0,
-            reveal:false
-        });
-    });
-}
+function resetGame(){let ref=db.ref("rooms/"+roomID);ref.once("value").then(snap=>{let data=snap.val();let deck=createDeck();let players=data.players;Object.keys(players).forEach(id=>{players[id].hand=[];players[id].stand=false;});ref.update({deck:deck,players:players,started:false,currentTurn:0,reveal:false});});}
 
 // ---------- UI ----------
-function renderPlayers(data){
-    let html="";
-    Object.values(data.players).forEach(p=>{html+=`<div class="player">${p.name}</div>`;});
-    document.getElementById("players").innerHTML = html;
-}
-
-function renderGame(data){
-    let html="";
-    let ids = Object.keys(data.players);
-    ids.forEach((id,i)=>{
-        let p = data.players[id];
-        let turn = i==data.currentTurn?"turn":"";
-        html += `<div class="player ${turn}"><h3>${p.name}</h3>`;
-        p.hand.forEach(c=>{
-            if(id==userID || data.reveal){html+=`<div class="card">${c.rank}${c.suit}</div>`;}
-            else{html+=`<div class="card back">🂠</div>`;}
-        });
-        if(id==userID){html+=`<div>Score: ${score(p.hand)}</div>`;}
-        if(blackjack(p.hand)){html+=`<div class="blackjack">BLACKJACK!</div>`;}
-        html+="</div>";
-    });
-    document.getElementById("game").innerHTML = html;
-}
-
-function renderControls(data){
-    let ids = Object.keys(data.players);
-    let current = ids[data.currentTurn];
-    let dealerID = data.host;
-
-    if(current!=userID){document.getElementById("controls").innerHTML="等待其他玩家操作..."; return;}
-
-    let player = data.players[userID];
-    let handScore = score(player.hand);
-    let disableHit = blackjack(player.hand)||strongPair(player.hand)||handScore>=21;
-    let hitBtn = disableHit?"":`<button onclick="hit()">Hit</button>`;
-    let standBtn = `<button onclick="stand()">Stand / Pass</button>`;
-    document.getElementById("controls").innerHTML = hitBtn+standBtn;
-
-    if(userID==dealerID && allStand(data)){
-        document.getElementById("controls").innerHTML += `<br><button onclick="reveal();">Reveal All</button><br><button onclick="resetGame();">下一局</button>`;
-    }
-}
-
+function renderPlayers(data){let html="";Object.values(data.players).forEach(p=>{html+=`<div class="player">${p.name}</div>`;});document.getElementById("players").innerHTML=html;}
+function renderGame(data){let html="";let ids=Object.keys(data.players);ids.forEach((id,i)=>{let p=data.players[id];let turn=i==data.currentTurn?"turn":"";html+=`<div class="player ${turn}"><h3>${p.name}</h3>`;p.hand.forEach(c=>{if(id==userID || data.reveal){html+=`<div class="card">${c.rank}${c.suit}</div>`;}else{html+=`<div class="card back">🂠</div>`;}});if(id==userID){html+=`<div>Score: ${score(p.hand)}</div>`;}if(blackjack(p.hand)){html+=`<div class="blackjack">BLACKJACK!</div>`;}html+="</div>";});document.getElementById("game").innerHTML=html;}
+function renderControls(data){let ids=Object.keys(data.players);let current=ids[data.currentTurn];let dealerID=data.host;if(current!=userID){document.getElementById("controls").innerHTML="等待其他玩家操作..."; return;}let player=data.players[userID];let handScore=score(player.hand);let disableHit=blackjack(player.hand)||strongPair(player.hand)||handScore>=21;let hitBtn=disableHit?"":`<button onclick="hit()">Hit</button>`;let standBtn=`<button onclick="stand()">Stand / Pass</button>`;document.getElementById("controls").innerHTML=hitBtn+standBtn;if(userID==dealerID && allStand(data)){document.getElementById("controls").innerHTML+=`<br><button onclick="reveal();">Reveal All</button><br><button onclick="resetGame();">下一局</button>`;}}
 function allStand(data){return Object.values(data.players).every(p=>p.stand);}
 </script>
 </body>
