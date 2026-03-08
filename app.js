@@ -1,7 +1,8 @@
+// Telegram WebApp 初始化
 const tg = window.Telegram.WebApp;
 tg.expand();
 
-// 用户ID（Telegram用户ID，如果获取不到用随机数）
+// 用户ID
 let userID = tg.initDataUnsafe.user?.id || Math.floor(Math.random() * 1000000);
 
 // 玩家名字
@@ -10,12 +11,13 @@ let username = "Player";
 // 当前房间ID
 let roomID = null;
 
-// 创建房间
+// ----------------- 房间创建 -----------------
 function createRoom() {
     username = document.getElementById("nameInput").value.trim() || "Host";
 
     roomID = "room" + Math.floor(Math.random() * 9999);
 
+    // 初始化房间数据
     db.ref("rooms/" + roomID).set({
         host: userID,
         started: false,
@@ -34,7 +36,7 @@ function createRoom() {
     listenRoom();
 }
 
-// 加入房间
+// ----------------- 加入房间 -----------------
 function joinRoom() {
     username = document.getElementById("nameInput").value.trim() || "Player";
 
@@ -53,23 +55,25 @@ function joinRoom() {
     listenRoom();
 }
 
-// 监听房间数据
+// ----------------- 监听房间 -----------------
 function listenRoom() {
     db.ref("rooms/" + roomID).on("value", snap => {
         let data = snap.val();
         if (!data) return;
 
-        document.getElementById("roomInfo").innerHTML = "Room: " + roomID;
+        document.getElementById("roomInfo").innerHTML = `Room: ${roomID}`;
 
         renderPlayers(data);
 
-        // 房主显示 Start Game 按钮
+        // 房主显示 Start Game 按钮，且房间未开始
         if (data.host == userID && data.started === false) {
+            let playerCount = Object.keys(data.players).length;
             document.getElementById("controls").innerHTML =
-                `<button onclick="startGame()">Start Game</button>`;
+                `<div>玩家人数: ${playerCount} (房主可开始游戏)</div>
+                 <button onclick="startGame()">Start Game</button>`;
         }
 
-        // 游戏开始后渲染
+        // 游戏开始后渲染玩家手牌和操作按钮
         if (data.started) {
             renderGame(data);
             renderControls(data);
@@ -77,7 +81,7 @@ function listenRoom() {
     });
 }
 
-// 开始游戏（房主点击）
+// ----------------- 开始游戏（房主点击） -----------------
 function startGame() {
     let ref = db.ref("rooms/" + roomID);
 
@@ -86,7 +90,7 @@ function startGame() {
         let deck = data.deck;
         let players = data.players;
 
-        // 每人发两张牌
+        // 每位玩家发两张牌
         Object.keys(players).forEach(id => {
             players[id].hand = [deck.pop(), deck.pop()];
             players[id].stand = false; // 重置状态
@@ -102,7 +106,7 @@ function startGame() {
     });
 }
 
-// 玩家抽牌
+// ----------------- 玩家抽牌 -----------------
 function hit() {
     let ref = db.ref("rooms/" + roomID);
 
@@ -120,7 +124,7 @@ function hit() {
     });
 }
 
-// 玩家选择停止补牌
+// ----------------- 玩家停止补牌 -----------------
 function stand() {
     let ref = db.ref("rooms/" + roomID);
 
@@ -128,13 +132,12 @@ function stand() {
         let data = snap.val();
         let ids = Object.keys(data.players);
 
-        let nextTurn = data.currentTurn + 1;
-
-        // 如果轮到最后一人则不超过总玩家数
-        if (nextTurn >= ids.length) nextTurn = ids.length - 1;
-
         // 标记玩家停止
         data.players[userID].stand = true;
+
+        // 推进轮次
+        let nextTurn = data.currentTurn + 1;
+        if (nextTurn >= ids.length) nextTurn = ids.length - 1;
 
         ref.update({
             players: data.players,
@@ -143,27 +146,29 @@ function stand() {
     });
 }
 
-// 房主公开所有牌
+// ----------------- 房主公开所有牌 -----------------
 function reveal() {
     db.ref("rooms/" + roomID).update({
         reveal: true
     });
 }
 
-// 渲染玩家操作按钮
+// ----------------- 渲染玩家操作按钮 -----------------
 function renderControls(data) {
+    if (!data.started) return;
+
     let ids = Object.keys(data.players);
     let currentPlayer = ids[data.currentTurn];
 
     if (currentPlayer != userID) {
-        document.getElementById("controls").innerHTML = "等待其他玩家...";
+        document.getElementById("controls").innerHTML = "等待其他玩家操作...";
         return;
     }
 
     let player = data.players[userID];
     let handScore = score(player.hand);
 
-    // 判断是否自动锁牌（Blackjack或对子8+）
+    // 自动锁牌条件
     let disableHit = blackjack(player.hand) || strongPair(player.hand) || handScore >= 21;
 
     let hitBtn = disableHit ? "" : `<button onclick="hit()">Hit</button>`;
@@ -171,13 +176,13 @@ function renderControls(data) {
 
     document.getElementById("controls").innerHTML = hitBtn + standBtn;
 
-    // 如果是房主，游戏结束显示 Reveal
+    // 游戏最后，房主可以 Reveal
     if (data.host == userID && data.currentTurn == ids.length - 1 && allStand(data)) {
         document.getElementById("controls").innerHTML += `<br><button onclick="reveal()">Reveal All</button>`;
     }
 }
 
-// 判断所有玩家是否都停止补牌
+// ----------------- 判断所有玩家是否都停止补牌 -----------------
 function allStand(data) {
     return Object.values(data.players).every(p => p.stand);
 }
