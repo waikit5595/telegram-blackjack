@@ -1,10 +1,11 @@
 <!DOCTYPE html>
 <html>
+
 <head>
 
 <meta charset="UTF-8">
 
-<title>Telegram Blackjack Pro</title>
+<title>Blackjack ULTRA</title>
 
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 
@@ -17,9 +18,11 @@
 
 <body>
 
-<h1>🂡 Blackjack</h1>
+<h1>🂡 Blackjack ULTRA</h1>
 
 <div id="lobby">
+
+<input id="nameInput" placeholder="Your name">
 
 <button onclick="createRoom()">Create Room</button>
 
@@ -29,7 +32,7 @@
 
 </div>
 
-<div id="room"></div>
+<div id="roomInfo"></div>
 
 <div id="players"></div>
 
@@ -38,8 +41,10 @@
 <div id="controls"></div>
 
 <script src="firebase.js"></script>
+<script src="cards.js"></script>
 <script src="game.js"></script>
+<script src="ui.js"></script>
+<script src="app.js"></script>
 
 </body>
-
 </html>
