@@ -1,5 +1,6 @@
 import { initializeApp, cert, getApps } from "firebase-admin/app";
 import { getDatabase } from "firebase-admin/database";
+import { getAuth } from "firebase-admin/auth";
 
 const projectId = process.env.FIREBASE_PROJECT_ID;
 const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
@@ -22,3 +23,4 @@ const adminApp =
     : getApps()[0];
 
 export const adminDb = getDatabase(adminApp);
+export const adminAuth = getAuth(adminApp);
