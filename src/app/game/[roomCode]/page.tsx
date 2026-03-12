@@ -8,7 +8,14 @@ import { PresenceMap, RoomData } from "@/lib/types";
 import ActionButtons from "@/components/ActionButtons";
 import TableHero from "@/components/TableHero";
 import RoundTableGame from "@/components/RoundTableGame";
-import { drawCardApi, endTurnApi, leaveRoomApi, nextRoundApi, revealGameApi } from "@/lib/api";
+import {
+  drawCardApi,
+  endTurnApi,
+  leaveRoomApi,
+  nextRoundApi,
+  revealGameApi,
+  revealPlayerApi,
+} from "@/lib/api";
 import { useGameSound } from "@/hooks/useGameSound";
 import { useRoomPresence } from "@/hooks/useRoomPresence";
 
@@ -25,14 +32,53 @@ export default function GamePage() {
   useEffect(() => subscribePresence(roomCode, setPresence), [roomCode]);
 
   const uid = auth.currentUser?.uid;
-  const me = useMemo(() => (uid && room?.players ? room.players[uid] : null), [uid, room]);
-  const hand = useMemo(() => (uid && room?.hands ? room.hands[uid] : null), [uid, room]);
-  const players = useMemo(() => (room?.players ? Object.values(room.players).sort((a, b) => (a.seat || 99) - (b.seat || 99)) : []), [room]);
 
-  const isCurrentTurn = !!me && room?.currentTurnSeat === me.seat && room?.status === "playing";
-  const canAct = !!isCurrentTurn && hand && !hand.locked;
-  const showReveal = room?.status === "playing" && room?.currentTurnSeat == null && !!room?.hands && Object.keys(room.hands).length > 0;
+  const me = useMemo(
+    () => (uid && room?.players ? room.players[uid] : null),
+    [uid, room]
+  );
+
+  const hand = useMemo(
+    () => (uid && room?.hands ? room.hands[uid] : null),
+    [uid, room]
+  );
+
+  const players = useMemo(
+    () =>
+      room?.players
+        ? Object.values(room.players).sort((a, b) => (a.seat || 99) - (b.seat || 99))
+        : [],
+    [room]
+  );
+
+  useEffect(() => {
+    // ✅ 如果房间还在 waiting，自动回到选座页面
+    if (room?.status === "waiting") {
+      router.push(`/room/${roomCode}`);
+    }
+
+    if (room?.status === "closed") {
+      alert("This room has been closed.");
+      router.push("/");
+    }
+  }, [room?.status, roomCode, router]);
+
+  const isCurrentTurn =
+    !!me &&
+    room?.currentTurnSeat === me.seat &&
+    room?.status === "playing";
+
+  const canAct = !!isCurrentTurn && !!hand;
+
+  const showReveal =
+    room?.status === "playing" &&
+    room?.currentTurnSeat == null &&
+    !!room?.hands &&
+    Object.keys(room.hands).length > 0;
+
   const showNextRound = room?.status === "revealed";
+
+  const isBustTurn = !!(isCurrentTurn && hand?.status === "bust");
 
   const currentPlayerName = useMemo(() => {
     const seat = room?.currentTurnSeat;
@@ -41,21 +87,33 @@ export default function GamePage() {
     return player?.name || "Dealer Finished";
   }, [room]);
 
-  const { playDeal, playAction, playBlackjack, playBust, playReveal } = useGameSound();
+  const canDealerRevealPlayer =
+    !!me?.isDealer &&
+    room?.status === "playing" &&
+    (hand?.score || 0) >= 16;
+
+  const revealTargets = useMemo(() => {
+    if (!room?.players || !room?.hands || !me?.isDealer) return [];
+    return Object.values(room.players)
+      .filter((p) => !p.isDealer)
+      .filter((p) => room.hands?.[p.uid])
+      .filter((p) => !room.hands?.[p.uid]?.publicRevealed)
+      .map((p) => ({
+        uid: p.uid,
+        name: p.name,
+      }));
+  }, [room, me]);
+
+  const { playDeal, playAction, playBlackjack, playBust, playReveal } =
+    useGameSound();
+
   const lastRoundRef = useRef<number | null>(null);
   const lastRevealRef = useRef<boolean>(false);
   const statusPlayedRef = useRef<string>("");
 
   useEffect(() => {
     if (!room) return;
-    if (room.status === "closed") {
-      alert("This room has been closed.");
-      router.push("/");
-    }
-  }, [room?.status, router, room]);
 
-  useEffect(() => {
-    if (!room) return;
     if (room.currentRound && room.currentRound !== lastRoundRef.current) {
       lastRoundRef.current = room.currentRound;
       players.forEach((_, idx) => {
@@ -129,14 +187,29 @@ export default function GamePage() {
     }
   }
 
+  async function onRevealPlayer(targetUid: string) {
+    try {
+      await revealPlayerApi({ roomCode, targetUid });
+    } catch (error: any) {
+      alert(error.message || "Failed to reveal player.");
+    }
+  }
+
   return (
     <main className="min-h-screen px-4 md:px-6 py-8 md:py-10">
-      <TableHero title="BLACKJACK PARTY" subtitle={`Status: ${room?.status || "loading"} • Now Playing: ${currentPlayerName}`} roomCode={roomCode} />
+      <TableHero
+        title="BLACKJACK PARTY"
+        subtitle={`Status: ${room?.status || "loading"} • Now Playing: ${currentPlayerName}`}
+        roomCode={roomCode}
+      />
 
       <div className="max-w-7xl mx-auto mt-8 md:mt-10 table-surface rounded-[32px] md:rounded-[40px] border border-emerald-400/15 shadow-table p-5 md:p-8">
         <div className="rounded-[28px] md:rounded-[32px] border border-white/10 bg-black/20 p-4 md:p-5">
           <div className="text-white/70 text-sm">Important Rule</div>
-          <div className="mt-1 text-white/90">Other players cannot see hidden cards, score, or bust status until the dealer finishes and the host reveals all hands.</div>
+          <div className="mt-1 text-white/90">
+            Other players cannot see hidden cards, score, or bust status until
+            the dealer finishes and the host reveals all hands.
+          </div>
         </div>
 
         <div className="mt-6">
@@ -159,6 +232,10 @@ export default function GamePage() {
           onLeave={onLeave}
           showReveal={!!showReveal}
           showNextRound={!!showNextRound}
+          canDealerRevealPlayer={!!canDealerRevealPlayer}
+          revealTargets={revealTargets}
+          onRevealPlayer={onRevealPlayer}
+          isBustTurn={!!isBustTurn}
         />
       </div>
     </main>

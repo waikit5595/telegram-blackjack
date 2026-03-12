@@ -71,7 +71,6 @@ export default function RoomPage() {
 
   const isHost = auth.currentUser?.uid === room?.hostUid;
 
-  // ✅ 不再被 offline 状态卡住
   const canStart =
     isHost &&
     players.length >= 2 &&
@@ -101,32 +100,21 @@ export default function RoomPage() {
               </div>
 
               <div className="mt-5 space-y-3">
-                {players.map((p) => {
-                  // ✅ 只要人在房间列表里，就先视为在线
-                  const isOnline = true;
-
-                  return (
-                    <div
-                      key={p.uid}
-                      className="rounded-2xl bg-black/20 border border-white/10 p-4 flex items-center justify-between gap-3"
-                    >
-                      <div>
-                        <span className="font-semibold">{p.name}</span> — Seat{" "}
-                        {p.seat ?? "-"} {p.isDealer ? "(Dealer)" : ""}
-                      </div>
-
-                      <div
-                        className={`text-xs px-2 py-1 rounded-full ${
-                          isOnline
-                            ? "bg-emerald-500/15 text-emerald-200 border border-emerald-400/30"
-                            : "bg-red-500/15 text-red-200 border border-red-400/30"
-                        }`}
-                      >
-                        {isOnline ? "Online" : "Offline"}
-                      </div>
+                {players.map((p) => (
+                  <div
+                    key={p.uid}
+                    className="rounded-2xl bg-black/20 border border-white/10 p-4 flex items-center justify-between gap-3"
+                  >
+                    <div>
+                      <span className="font-semibold">{p.name}</span> — Seat{" "}
+                      {p.seat ?? "-"} {p.isDealer ? "(Dealer)" : ""}
                     </div>
-                  );
-                })}
+
+                    <div className="text-xs px-2 py-1 rounded-full bg-emerald-500/15 text-emerald-200 border border-emerald-400/30">
+                      Online
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
 
@@ -137,6 +125,7 @@ export default function RoomPage() {
                   <div className="text-white/60 mt-1">
                     Select any free seat from 1 to 11.
                   </div>
+
                   <div className="mt-5">
                     <SeatPicker
                       seats={room?.seats}
@@ -151,6 +140,7 @@ export default function RoomPage() {
                   <div className="text-white/60 mt-1">
                     Waiting for players to join and choose seats.
                   </div>
+
                   <div className="mt-5 rounded-2xl p-4 bg-yellow-500/10 border border-yellow-400/20 text-yellow-100">
                     You are the Dealer • Fixed at Seat 12
                   </div>

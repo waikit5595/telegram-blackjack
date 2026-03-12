@@ -1,7 +1,20 @@
 import { adminDb } from "@/lib/admin";
 
 export type Suit = "spades" | "hearts" | "clubs" | "diamonds";
-export type Rank = "A" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" | "10" | "J" | "Q" | "K";
+export type Rank =
+  | "A"
+  | "2"
+  | "3"
+  | "4"
+  | "5"
+  | "6"
+  | "7"
+  | "8"
+  | "9"
+  | "10"
+  | "J"
+  | "Q"
+  | "K";
 
 export interface Card {
   rank: Rank;
@@ -21,7 +34,21 @@ function shuffle<T>(array: T[]): T[] {
 
 export function createDeck(): Card[] {
   const suits: Suit[] = ["spades", "hearts", "clubs", "diamonds"];
-  const ranks: Rank[] = ["A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"];
+  const ranks: Rank[] = [
+    "A",
+    "2",
+    "3",
+    "4",
+    "5",
+    "6",
+    "7",
+    "8",
+    "9",
+    "10",
+    "J",
+    "Q",
+    "K",
+  ];
   const deck: Card[] = [];
   for (const suit of suits) {
     for (const rank of ranks) deck.push({ rank, suit });
@@ -73,19 +100,97 @@ export function isBlackjack(cards: Card[]) {
 }
 
 export function isHighPairLock(cards: Card[]) {
-  return cards.length === 2 && cards[0].rank === cards[1].rank && ["8", "9", "10", "J", "Q", "K", "A"].includes(cards[0].rank);
+  return (
+    cards.length === 2 &&
+    cards[0].rank === cards[1].rank &&
+    ["8", "9", "10", "J", "Q", "K", "A"].includes(cards[0].rank)
+  );
 }
 
 export function evaluateHand(cards: Card[]) {
   const score = calculateScore(cards);
 
-  if (isBlackjack(cards)) return { cards, score, locked: true, busted: false, stood: false, status: "blackjack", autoLockedReason: "blackjack", result: null };
-  if (isHighPairLock(cards)) return { cards, score, locked: true, busted: false, stood: false, status: "locked", autoLockedReason: "high-pair", result: null };
-  if (score > 21) return { cards, score, locked: true, busted: true, stood: false, status: "bust", autoLockedReason: "bust", result: null };
-  if (score === 21) return { cards, score, locked: true, busted: false, stood: false, status: "21", autoLockedReason: "21", result: null };
-  if (cards.length >= 5) return { cards, score, locked: true, busted: false, stood: false, status: "five-card", autoLockedReason: "five-card", result: null };
+  if (isBlackjack(cards)) {
+    return {
+      cards,
+      score,
+      locked: true,
+      busted: false,
+      stood: false,
+      status: "blackjack",
+      autoLockedReason: "blackjack",
+      result: null,
+      publicRevealed: false,
+    };
+  }
 
-  return { cards, score, locked: false, busted: false, stood: false, status: "playing", autoLockedReason: null, result: null };
+  if (isHighPairLock(cards)) {
+    return {
+      cards,
+      score,
+      locked: true,
+      busted: false,
+      stood: false,
+      status: "locked",
+      autoLockedReason: "high-pair",
+      result: null,
+      publicRevealed: false,
+    };
+  }
+
+  if (score > 21) {
+    return {
+      cards,
+      score,
+      locked: true,
+      busted: true,
+      stood: false,
+      status: "bust",
+      autoLockedReason: "bust",
+      result: null,
+      publicRevealed: false,
+    };
+  }
+
+  if (score === 21) {
+    return {
+      cards,
+      score,
+      locked: true,
+      busted: false,
+      stood: false,
+      status: "21",
+      autoLockedReason: "21",
+      result: null,
+      publicRevealed: false,
+    };
+  }
+
+  if (cards.length >= 5) {
+    return {
+      cards,
+      score,
+      locked: true,
+      busted: false,
+      stood: false,
+      status: "five-card",
+      autoLockedReason: "five-card",
+      result: null,
+      publicRevealed: false,
+    };
+  }
+
+  return {
+    cards,
+    score,
+    locked: false,
+    busted: false,
+    stood: false,
+    status: "playing",
+    autoLockedReason: null,
+    result: null,
+    publicRevealed: false,
+  };
 }
 
 export function buildEmptySeats() {
@@ -123,11 +228,13 @@ export function nextTurnSeat(room: any): number | null {
   const players = room.players || {};
   const hands = room.hands || {};
   const ordered = getPlayersInSeatOrder(players);
+
   for (const p of ordered) {
     const hand = hands[p.uid];
     if (!hand) continue;
     if (!hand.locked && !hand.stood) return p.seat;
   }
+
   return null;
 }
 
@@ -155,6 +262,7 @@ export function applyResultsAndReveal(room: any) {
     hands[p.uid] = {
       ...hands[p.uid],
       result: p.uid === dealer.uid ? "draw" : compareToDealer(hands[p.uid], dealerHand),
+      publicRevealed: true,
     };
   }
 

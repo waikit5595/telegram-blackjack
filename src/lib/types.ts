@@ -1,5 +1,18 @@
 export type Suit = "spades" | "hearts" | "clubs" | "diamonds";
-export type Rank = "A" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" | "10" | "J" | "Q" | "K";
+export type Rank =
+  | "A"
+  | "2"
+  | "3"
+  | "4"
+  | "5"
+  | "6"
+  | "7"
+  | "8"
+  | "9"
+  | "10"
+  | "J"
+  | "Q"
+  | "K";
 
 export interface Card {
   rank: Rank;
@@ -24,6 +37,7 @@ export interface HandState {
   status: string;
   autoLockedReason?: string | null;
   result?: "win" | "lose" | "draw" | null;
+  publicRevealed?: boolean; // ✅ 新增：庄家可提前公开指定玩家
 }
 
 export interface RoomData {

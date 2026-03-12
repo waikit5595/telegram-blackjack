@@ -5,7 +5,7 @@ import { HandState, PlayerRoomState } from "@/lib/types";
 function getPublicLabel(hand?: HandState, revealAll?: boolean, isSelf?: boolean) {
   if (!hand) return { label: "Waiting", tone: "neutral" as const };
 
-  if (!revealAll && !isSelf) {
+  if (!revealAll && !isSelf && !hand.publicRevealed) {
     if (hand.locked) return { label: "Locked", tone: "blue" as const };
     return { label: "Waiting", tone: "neutral" as const };
   }
@@ -20,7 +20,7 @@ function getPublicLabel(hand?: HandState, revealAll?: boolean, isSelf?: boolean)
     case "five-card":
       return { label: "5 Cards", tone: "green" as const };
     case "stood":
-      return { label: "Stand", tone: "blue" as const };
+      return { label: "Pass", tone: "blue" as const };
     case "locked":
       return { label: "Locked", tone: "blue" as const };
     default:
@@ -46,6 +46,7 @@ export default function PlayerSeat({
   online?: boolean;
 }) {
   const cards = hand?.cards || [];
+  const forceReveal = revealAll || isSelf || !!hand?.publicRevealed;
   const publicState = getPublicLabel(hand, revealAll, isSelf);
 
   return (
@@ -78,17 +79,19 @@ export default function PlayerSeat({
           <CardView
             key={index}
             card={card}
-            hidden={!revealAll && !isSelf}
+            hidden={!forceReveal}
             delay={dealBaseDelay + index * 0.17}
-            emphasize={revealAll && hand?.status === "blackjack"}
+            emphasize={forceReveal && hand?.status === "blackjack"}
           />
         ))}
       </div>
 
       <div className="mt-4 text-sm min-h-10">
-        {revealAll || isSelf ? (
+        {forceReveal ? (
           <div className="space-y-1">
-            <div className="text-white/85">Score: <span className="font-semibold">{hand?.score ?? "-"}</span></div>
+            <div className="text-white/85">
+              Score: <span className="font-semibold">{hand?.score ?? "-"}</span>
+            </div>
             {revealAll && hand?.result && (
               <div
                 className={`font-semibold uppercase ${

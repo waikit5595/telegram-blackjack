@@ -44,3 +44,7 @@ export const endTurnApi = (body: { roomCode: string }) => authedPost("/api/end-t
 export const revealGameApi = (body: { roomCode: string }) => authedPost("/api/reveal-game", body);
 export const nextRoundApi = (body: { roomCode: string }) => authedPost("/api/next-round", body);
 export const leaveRoomApi = (body: { roomCode: string }) => authedPost("/api/leave-room", body);
+
+// ✅ 新增
+export const revealPlayerApi = (body: { roomCode: string; targetUid: string }) =>
+  authedPost("/api/reveal-player", body);
