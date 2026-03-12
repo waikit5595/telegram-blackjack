@@ -17,6 +17,7 @@ function playTone(frequency: number, duration: number, type: OscillatorType, gai
 
   oscillator.connect(gain);
   gain.connect(ctx.destination);
+
   oscillator.start();
   oscillator.stop(ctx.currentTime + duration);
 

@@ -2,7 +2,13 @@ import { adminDb } from "@/lib/admin";
 
 export type Suit = "spades" | "hearts" | "clubs" | "diamonds";
 export type Rank = "A" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" | "10" | "J" | "Q" | "K";
-export interface Card { rank: Rank; suit: Suit; }
+
+export interface Card {
+  rank: Rank;
+  suit: Suit;
+}
+
+export const ROOM_STALE_MS = 30 * 60 * 1000;
 
 function shuffle<T>(array: T[]): T[] {
   const arr = [...array];
@@ -17,7 +23,9 @@ export function createDeck(): Card[] {
   const suits: Suit[] = ["spades", "hearts", "clubs", "diamonds"];
   const ranks: Rank[] = ["A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"];
   const deck: Card[] = [];
-  for (const suit of suits) for (const rank of ranks) deck.push({ rank, suit });
+  for (const suit of suits) {
+    for (const rank of ranks) deck.push({ rank, suit });
+  }
   return shuffle(deck);
 }
 
@@ -31,12 +39,19 @@ export function calculateScore(cards: Card[]): number {
   const cardCount = cards.length;
   let total = 0;
   let aceCount = 0;
+
   for (const card of cards) {
-    if (card.rank === "A") { aceCount++; total += 1; }
-    else total += getBaseValue(card.rank);
+    if (card.rank === "A") {
+      aceCount++;
+      total += 1;
+    } else {
+      total += getBaseValue(card.rank);
+    }
   }
+
   const aceBonus = cardCount === 2 ? 10 : cardCount === 3 ? 9 : 0;
   let possibleScores: number[] = [total];
+
   for (let i = 0; i < aceCount; i++) {
     const next: number[] = [];
     for (const score of possibleScores) {
@@ -45,6 +60,7 @@ export function calculateScore(cards: Card[]): number {
     }
     possibleScores = [...new Set(next)];
   }
+
   const valid = possibleScores.filter((x) => x <= 21).sort((a, b) => b - a);
   if (valid.length > 0) return valid[0];
   return Math.min(...possibleScores);
@@ -62,16 +78,39 @@ export function isHighPairLock(cards: Card[]) {
 
 export function evaluateHand(cards: Card[]) {
   const score = calculateScore(cards);
+
   if (isBlackjack(cards)) return { cards, score, locked: true, busted: false, stood: false, status: "blackjack", autoLockedReason: "blackjack", result: null };
   if (isHighPairLock(cards)) return { cards, score, locked: true, busted: false, stood: false, status: "locked", autoLockedReason: "high-pair", result: null };
   if (score > 21) return { cards, score, locked: true, busted: true, stood: false, status: "bust", autoLockedReason: "bust", result: null };
   if (score === 21) return { cards, score, locked: true, busted: false, stood: false, status: "21", autoLockedReason: "21", result: null };
   if (cards.length >= 5) return { cards, score, locked: true, busted: false, stood: false, status: "five-card", autoLockedReason: "five-card", result: null };
+
   return { cards, score, locked: false, busted: false, stood: false, status: "playing", autoLockedReason: null, result: null };
 }
 
+export function buildEmptySeats() {
+  const seats: Record<string, string | null> = {};
+  for (let i = 1; i <= 12; i++) seats[String(i)] = null;
+  return seats;
+}
+
+export function generateRoomCode() {
+  return String(Math.floor(100000 + Math.random() * 900000));
+}
+
+export async function nextAvailableRoomCode(): Promise<string> {
+  for (let i = 0; i < 20; i++) {
+    const code = generateRoomCode();
+    const snap = await adminDb.ref(`rooms/${code}`).get();
+    if (!snap.exists()) return code;
+  }
+  throw new Error("Unable to generate unique room code.");
+}
+
 export function getPlayersInSeatOrder(players: Record<string, any>) {
-  return Object.values(players).filter((p: any) => p.seat !== null).sort((a: any, b: any) => a.seat - b.seat);
+  return Object.values(players)
+    .filter((p: any) => p.seat !== null)
+    .sort((a: any, b: any) => a.seat - b.seat);
 }
 
 export function drawFromDeck(deck: Card[]) {
@@ -102,28 +141,16 @@ export function compareToDealer(player: any, dealer: any): "win" | "lose" | "dra
   return "draw";
 }
 
-export function buildEmptySeats() {
-  const seats: Record<string, string | null> = {};
-  for (let i = 1; i <= 12; i++) seats[String(i)] = null;
-  return seats;
-}
-
-export function generateRoomCode() {
-  return String(Math.floor(1000 + Math.random() * 9000));
-}
-
-export async function nextAvailableRoomCode(): Promise<string> {
-  return generateRoomCode();
-}
-
 export function applyResultsAndReveal(room: any) {
   const ordered = getPlayersInSeatOrder(room.players || {});
   const dealer = ordered.find((p: any) => p.isDealer);
   if (!dealer) throw new Error("Dealer not found.");
+
   const dealerHand = room.hands?.[dealer.uid];
   if (!dealerHand) throw new Error("Dealer hand not found.");
 
   const hands = { ...(room.hands || {}) };
+
   for (const p of ordered) {
     hands[p.uid] = {
       ...hands[p.uid],
@@ -132,9 +159,34 @@ export function applyResultsAndReveal(room: any) {
   }
 
   return {
-    status: "revealed" as const,
+    status: "revealed",
     revealAll: true,
     currentTurnSeat: null,
     hands,
+    updatedAt: Date.now(),
+    lastActiveAt: Date.now(),
+  };
+}
+
+export function assertRoomNotStale(room: any) {
+  const lastActiveAt = Number(room?.lastActiveAt || room?.updatedAt || room?.createdAt || 0);
+  if (lastActiveAt && Date.now() - lastActiveAt > ROOM_STALE_MS) {
+    throw new Error("This room has expired.");
+  }
+}
+
+export function baseRoomTimestamps() {
+  const now = Date.now();
+  return {
+    createdAt: now,
+    updatedAt: now,
+    lastActiveAt: now,
+  };
+}
+
+export function touchRoomFields() {
+  return {
+    updatedAt: Date.now(),
+    lastActiveAt: Date.now(),
   };
 }

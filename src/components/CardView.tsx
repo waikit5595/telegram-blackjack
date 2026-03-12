@@ -18,7 +18,7 @@ export default function CardView({
       initial={{ rotateY: 180, opacity: 0, y: -12, scale: 0.94 }}
       animate={{ rotateY: 0, opacity: 1, y: 0, scale: 1 }}
       transition={{ duration: 0.35, delay }}
-      className={`w-16 h-24 rounded-xl border shadow-lg flex items-center justify-center font-bold ${
+      className={`w-14 h-20 md:w-16 md:h-24 rounded-xl border shadow-lg flex items-center justify-center font-bold ${
         hidden || !card
           ? "card-back border-white/20 text-white"
           : "bg-white text-black border-black/10"

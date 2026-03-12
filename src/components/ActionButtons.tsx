@@ -4,6 +4,7 @@ export default function ActionButtons({
   onStand,
   onReveal,
   onNextRound,
+  onLeave,
   showReveal,
   showNextRound,
 }: {
@@ -12,6 +13,7 @@ export default function ActionButtons({
   onStand: () => void;
   onReveal: () => void;
   onNextRound: () => void;
+  onLeave: () => void;
   showReveal: boolean;
   showNextRound: boolean;
 }) {
@@ -49,6 +51,10 @@ export default function ActionButtons({
             New Round
           </button>
         )}
+
+        <button onClick={onLeave} className="px-5 py-3 rounded-2xl bg-red-700 hover:bg-red-600 font-semibold">
+          Leave Room
+        </button>
       </div>
     </div>
   );

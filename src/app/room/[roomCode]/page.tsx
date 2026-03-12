@@ -3,24 +3,31 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { auth } from "@/lib/firebase";
-import { subscribeRoom } from "@/lib/room";
-import { RoomData } from "@/lib/types";
+import { subscribePresence, subscribeRoom } from "@/lib/room";
+import { PresenceMap, RoomData } from "@/lib/types";
 import SeatPicker from "@/components/SeatPicker";
 import TableHero from "@/components/TableHero";
 import RoundTableSeats from "@/components/RoundTableSeats";
-import { chooseSeatApi, startGameApi } from "@/lib/api";
+import { chooseSeatApi, leaveRoomApi, startGameApi } from "@/lib/api";
+import { useRoomPresence } from "@/hooks/useRoomPresence";
 
 export default function RoomPage() {
   const params = useParams<{ roomCode: string }>();
   const roomCode = params.roomCode;
   const [room, setRoom] = useState<RoomData | null>(null);
+  const [presence, setPresence] = useState<PresenceMap>({});
   const router = useRouter();
 
+  useRoomPresence(roomCode);
+
   useEffect(() => subscribeRoom(roomCode, setRoom), [roomCode]);
+  useEffect(() => subscribePresence(roomCode, setPresence), [roomCode]);
 
   useEffect(() => {
-    if (room?.status === "playing" || room?.status === "revealed") {
-      router.push(`/game/${roomCode}`);
+    if (room?.status === "playing" || room?.status === "revealed") router.push(`/game/${roomCode}`);
+    if (room?.status === "closed") {
+      alert("This room has been closed.");
+      router.push("/");
     }
   }, [room?.status, roomCode, router]);
 
@@ -46,33 +53,48 @@ export default function RoomPage() {
     }
   }
 
+  async function leaveRoom() {
+    try {
+      await leaveRoomApi({ roomCode });
+      router.push("/");
+    } catch (error: any) {
+      alert(error.message || "Failed to leave room.");
+    }
+  }
+
   const players = room?.players ? Object.values(room.players).sort((a, b) => (a.seat || 99) - (b.seat || 99)) : [];
   const isHost = auth.currentUser?.uid === room?.hostUid;
-  const canStart = isHost && players.length >= 2 && players.every((p) => p.isDealer || !!p.seat);
+  const activePlayers = players.filter((p) => p.isDealer || !!presence?.[p.uid]?.online);
+  const canStart = isHost && activePlayers.length >= 2 && activePlayers.every((p) => p.isDealer || !!p.seat);
 
   return (
-    <main className="min-h-screen px-6 py-10">
+    <main className="min-h-screen px-4 md:px-6 py-8 md:py-10">
       <TableHero title="BLACKJACK PARTY" subtitle="Waiting Room" roomCode={roomCode} />
 
-      <div className="max-w-6xl mx-auto mt-10 space-y-8">
-        <RoundTableSeats players={players} meUid={auth.currentUser?.uid} />
+      <div className="max-w-6xl mx-auto mt-8 md:mt-10 space-y-6 md:space-y-8">
+        <RoundTableSeats players={players} meUid={auth.currentUser?.uid} presence={presence} />
 
-        <div className="table-surface rounded-[40px] border border-emerald-400/15 shadow-table p-6 md:p-8">
+        <div className="table-surface rounded-[32px] md:rounded-[40px] border border-emerald-400/15 shadow-table p-5 md:p-8">
           <div className="grid xl:grid-cols-[1.1fr_0.9fr] gap-8">
             <div>
               <div className="text-xl font-bold">Players</div>
-              <div className="text-white/60 mt-1">Dealer is always fixed at Seat 12.</div>
+              <div className="text-white/60 mt-1">Dealer is always fixed at Seat 12. Offline players will be ignored when starting the game.</div>
 
               <div className="mt-5 space-y-3">
                 {players.map((p) => (
-                  <div key={p.uid} className="rounded-2xl bg-black/20 border border-white/10 p-4">
-                    <span className="font-semibold">{p.name}</span> — Seat {p.seat ?? "-"} {p.isDealer ? "(Dealer)" : ""}
+                  <div key={p.uid} className="rounded-2xl bg-black/20 border border-white/10 p-4 flex items-center justify-between gap-3">
+                    <div>
+                      <span className="font-semibold">{p.name}</span> — Seat {p.seat ?? "-"} {p.isDealer ? "(Dealer)" : ""}
+                    </div>
+                    <div className={`text-xs px-2 py-1 rounded-full ${presence?.[p.uid]?.online ? "bg-emerald-500/15 text-emerald-200 border border-emerald-400/30" : "bg-red-500/15 text-red-200 border border-red-400/30"}`}>
+                      {presence?.[p.uid]?.online ? "Online" : "Offline"}
+                    </div>
                   </div>
                 ))}
               </div>
             </div>
 
-            <div className="rounded-[32px] border border-white/10 bg-black/20 p-5">
+            <div className="rounded-[28px] md:rounded-[32px] border border-white/10 bg-black/20 p-5">
               {!me?.isDealer ? (
                 <>
                   <div className="text-xl font-bold">Choose Seat</div>
@@ -91,13 +113,19 @@ export default function RoomPage() {
                 </>
               )}
 
-              {isHost ? (
-                <button onClick={startGame} disabled={!canStart} className="mt-8 rounded-2xl bg-emerald-600 hover:bg-emerald-500 px-5 py-3.5 font-black text-lg">
-                  Start Game
+              <div className="flex gap-3 flex-wrap mt-8">
+                {isHost ? (
+                  <button onClick={startGame} disabled={!canStart} className="rounded-2xl bg-emerald-600 hover:bg-emerald-500 px-5 py-3.5 font-black text-lg">
+                    Start Game
+                  </button>
+                ) : (
+                  <div className="text-white/70 self-center">Waiting for host to start the game...</div>
+                )}
+
+                <button onClick={leaveRoom} className="rounded-2xl bg-red-700 hover:bg-red-600 px-5 py-3.5 font-black text-lg">
+                  Leave Room
                 </button>
-              ) : (
-                <div className="mt-8 text-white/70">Waiting for host to start the game...</div>
-              )}
+              </div>
             </div>
           </div>
         </div>

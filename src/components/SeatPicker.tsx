@@ -10,7 +10,7 @@ export default function SeatPicker({
   const items = Array.from({ length: 11 }, (_, i) => i + 1);
 
   return (
-    <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-6 gap-3">
+    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
       {items.map((seat) => {
         const occupied = !!seats?.[String(seat)];
         return (
@@ -20,7 +20,7 @@ export default function SeatPicker({
             disabled={occupied}
             className={`p-3 rounded-2xl border text-left ${
               selectedSeat === seat
-                ? "border-yellow-400 bg-yellow-500/10 shadow-[0_0_30px_rgba(250,204,21,0.2)]"
+                ? "border-yellow-400 bg-yellow-500/10 shadow-gold"
                 : "border-white/10 bg-white/5 hover:bg-white/10"
             }`}
           >

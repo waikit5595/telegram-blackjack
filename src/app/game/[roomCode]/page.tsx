@@ -1,22 +1,28 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { auth } from "@/lib/firebase";
-import { subscribeRoom } from "@/lib/room";
-import { RoomData } from "@/lib/types";
-import PlayerSeat from "@/components/PlayerSeat";
+import { subscribePresence, subscribeRoom } from "@/lib/room";
+import { PresenceMap, RoomData } from "@/lib/types";
 import ActionButtons from "@/components/ActionButtons";
 import TableHero from "@/components/TableHero";
-import { drawCardApi, endTurnApi, nextRoundApi, revealGameApi } from "@/lib/api";
+import RoundTableGame from "@/components/RoundTableGame";
+import { drawCardApi, endTurnApi, leaveRoomApi, nextRoundApi, revealGameApi } from "@/lib/api";
 import { useGameSound } from "@/hooks/useGameSound";
+import { useRoomPresence } from "@/hooks/useRoomPresence";
 
 export default function GamePage() {
   const params = useParams<{ roomCode: string }>();
   const roomCode = params.roomCode;
   const [room, setRoom] = useState<RoomData | null>(null);
+  const [presence, setPresence] = useState<PresenceMap>({});
+  const router = useRouter();
+
+  useRoomPresence(roomCode);
 
   useEffect(() => subscribeRoom(roomCode, setRoom), [roomCode]);
+  useEffect(() => subscribePresence(roomCode, setPresence), [roomCode]);
 
   const uid = auth.currentUser?.uid;
   const me = useMemo(() => (uid && room?.players ? room.players[uid] : null), [uid, room]);
@@ -42,6 +48,14 @@ export default function GamePage() {
 
   useEffect(() => {
     if (!room) return;
+    if (room.status === "closed") {
+      alert("This room has been closed.");
+      router.push("/");
+    }
+  }, [room?.status, router, room]);
+
+  useEffect(() => {
+    if (!room) return;
     if (room.currentRound && room.currentRound !== lastRoundRef.current) {
       lastRoundRef.current = room.currentRound;
       players.forEach((_, idx) => {
@@ -54,6 +68,7 @@ export default function GamePage() {
   useEffect(() => {
     const currentStatus = hand?.status || "";
     if (!currentStatus || currentStatus === statusPlayedRef.current) return;
+
     if (currentStatus === "blackjack") {
       playBlackjack();
       statusPlayedRef.current = currentStatus;
@@ -64,7 +79,9 @@ export default function GamePage() {
   }, [hand?.status, playBlackjack, playBust]);
 
   useEffect(() => {
-    if (room?.revealAll && !lastRevealRef.current) playReveal();
+    if (room?.revealAll && !lastRevealRef.current) {
+      playReveal();
+    }
     lastRevealRef.current = !!room?.revealAll;
   }, [room?.revealAll, playReveal]);
 
@@ -103,28 +120,34 @@ export default function GamePage() {
     }
   }
 
+  async function onLeave() {
+    try {
+      await leaveRoomApi({ roomCode });
+      router.push("/");
+    } catch (error: any) {
+      alert(error.message || "Failed to leave room.");
+    }
+  }
+
   return (
-    <main className="min-h-screen px-6 py-10">
+    <main className="min-h-screen px-4 md:px-6 py-8 md:py-10">
       <TableHero title="BLACKJACK PARTY" subtitle={`Status: ${room?.status || "loading"} • Now Playing: ${currentPlayerName}`} roomCode={roomCode} />
 
-      <div className="max-w-7xl mx-auto mt-10 table-surface rounded-[40px] border border-emerald-400/15 shadow-table p-6 md:p-8">
-        <div className="rounded-[32px] border border-white/10 bg-black/20 p-4 md:p-5">
+      <div className="max-w-7xl mx-auto mt-8 md:mt-10 table-surface rounded-[32px] md:rounded-[40px] border border-emerald-400/15 shadow-table p-5 md:p-8">
+        <div className="rounded-[28px] md:rounded-[32px] border border-white/10 bg-black/20 p-4 md:p-5">
           <div className="text-white/70 text-sm">Important Rule</div>
           <div className="mt-1 text-white/90">Other players cannot see hidden cards, score, or bust status until the dealer finishes and the host reveals all hands.</div>
         </div>
 
-        <div className="mt-6 grid md:grid-cols-2 xl:grid-cols-3 gap-4">
-          {players.map((player, index) => (
-            <PlayerSeat
-              key={player.uid}
-              player={player}
-              hand={room?.hands?.[player.uid]}
-              isSelf={uid === player.uid}
-              revealAll={!!room?.revealAll}
-              isCurrentTurn={room?.currentTurnSeat === player.seat}
-              dealBaseDelay={index * 0.16}
-            />
-          ))}
+        <div className="mt-6">
+          <RoundTableGame
+            players={players}
+            hands={room?.hands}
+            uid={uid}
+            revealAll={!!room?.revealAll}
+            currentTurnSeat={room?.currentTurnSeat}
+            presence={presence}
+          />
         </div>
 
         <ActionButtons
@@ -133,6 +156,7 @@ export default function GamePage() {
           onStand={onStand}
           onReveal={onReveal}
           onNextRound={onNextRound}
+          onLeave={onLeave}
           showReveal={!!showReveal}
           showNextRound={!!showNextRound}
         />

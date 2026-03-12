@@ -2,12 +2,23 @@
   "rules": {
     ".read": "auth != null",
     "rooms": {
-      "$roomCode": { ".read": "auth != null", ".write": false }
+      "$roomCode": {
+        ".read": "auth != null",
+        ".write": false
+      }
     },
     "users": {
       "$uid": {
         ".read": "auth != null && auth.uid === $uid",
         ".write": "auth != null && auth.uid === $uid"
+      }
+    },
+    "presence": {
+      "$roomCode": {
+        "$uid": {
+          ".read": "auth != null",
+          ".write": "auth != null && auth.uid === $uid"
+        }
       }
     }
   }

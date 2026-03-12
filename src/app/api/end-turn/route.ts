@@ -2,18 +2,21 @@ export const runtime = "nodejs";
 import { NextRequest, NextResponse } from "next/server";
 import { adminDb } from "@/lib/admin";
 import { requireUid } from "@/server/auth";
-import { applyResultsAndReveal, nextTurnSeat } from "@/server/game";
+import { applyResultsAndReveal, assertRoomNotStale, nextTurnSeat, touchRoomFields } from "@/server/game";
 
 export async function POST(request: NextRequest) {
   try {
     const uid = await requireUid(request);
     const { roomCode } = await request.json();
+
     const roomRef = adminDb.ref(`rooms/${roomCode}`);
     const snap = await roomRef.get();
     if (!snap.exists()) return NextResponse.json({ error: "Room not found." }, { status: 404 });
-
     const room = snap.val();
+    assertRoomNotStale(room);
+
     if (room.status !== "playing") return NextResponse.json({ error: "Game is not active." }, { status: 400 });
+
     const player = room.players?.[uid];
     if (!player) return NextResponse.json({ error: "You are not in this room." }, { status: 403 });
     if (player.seat !== room.currentTurnSeat) return NextResponse.json({ error: "It is not your turn." }, { status: 400 });
@@ -27,13 +30,14 @@ export async function POST(request: NextRequest) {
 
     if (player.isDealer && currentTurnSeat == null) {
       const revealed = applyResultsAndReveal({ players: room.players, hands: computedHands });
-      await roomRef.update(revealed);
+      await roomRef.update({ ...revealed, ...touchRoomFields() });
       return NextResponse.json({ ok: true });
     }
 
-    await roomRef.update({ [`hands/${uid}`]: newHand, currentTurnSeat });
+    await roomRef.update({ [`hands/${uid}`]: newHand, currentTurnSeat, ...touchRoomFields() });
     return NextResponse.json({ ok: true });
   } catch (error: any) {
+    console.error("end-turn error:", error);
     return NextResponse.json({ error: error.message || "internal" }, { status: 500 });
   }
 }
