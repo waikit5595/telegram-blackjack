@@ -24,7 +24,10 @@ export default function RoomPage() {
   useEffect(() => subscribePresence(roomCode, setPresence), [roomCode]);
 
   useEffect(() => {
-    if (room?.status === "playing" || room?.status === "revealed") router.push(`/game/${roomCode}`);
+    if (room?.status === "playing" || room?.status === "revealed") {
+      router.push(`/game/${roomCode}`);
+    }
+
     if (room?.status === "closed") {
       alert("This room has been closed.");
       router.push("/");
@@ -62,35 +65,68 @@ export default function RoomPage() {
     }
   }
 
-  const players = room?.players ? Object.values(room.players).sort((a, b) => (a.seat || 99) - (b.seat || 99)) : [];
+  const players = room?.players
+    ? Object.values(room.players).sort((a, b) => (a.seat || 99) - (b.seat || 99))
+    : [];
+
   const isHost = auth.currentUser?.uid === room?.hostUid;
-  const activePlayers = players.filter((p) => p.isDealer || !!presence?.[p.uid]?.online);
-  const canStart = isHost && activePlayers.length >= 2 && activePlayers.every((p) => p.isDealer || !!p.seat);
+
+  // ✅ 不再被 offline 状态卡住
+  const canStart =
+    isHost &&
+    players.length >= 2 &&
+    players.every((p) => p.isDealer || !!p.seat);
 
   return (
     <main className="min-h-screen px-4 md:px-6 py-8 md:py-10">
-      <TableHero title="BLACKJACK PARTY" subtitle="Waiting Room" roomCode={roomCode} />
+      <TableHero
+        title="BLACKJACK PARTY"
+        subtitle="Waiting Room"
+        roomCode={roomCode}
+      />
 
       <div className="max-w-6xl mx-auto mt-8 md:mt-10 space-y-6 md:space-y-8">
-        <RoundTableSeats players={players} meUid={auth.currentUser?.uid} presence={presence} />
+        <RoundTableSeats
+          players={players}
+          meUid={auth.currentUser?.uid}
+          presence={presence}
+        />
 
         <div className="table-surface rounded-[32px] md:rounded-[40px] border border-emerald-400/15 shadow-table p-5 md:p-8">
           <div className="grid xl:grid-cols-[1.1fr_0.9fr] gap-8">
             <div>
               <div className="text-xl font-bold">Players</div>
-              <div className="text-white/60 mt-1">Dealer is always fixed at Seat 12. Offline players will be ignored when starting the game.</div>
+              <div className="text-white/60 mt-1">
+                Dealer is always fixed at Seat 12.
+              </div>
 
               <div className="mt-5 space-y-3">
-                {players.map((p) => (
-                  <div key={p.uid} className="rounded-2xl bg-black/20 border border-white/10 p-4 flex items-center justify-between gap-3">
-                    <div>
-                      <span className="font-semibold">{p.name}</span> — Seat {p.seat ?? "-"} {p.isDealer ? "(Dealer)" : ""}
+                {players.map((p) => {
+                  const isOnline =
+                    p.uid === auth.currentUser?.uid || !!presence?.[p.uid]?.online;
+
+                  return (
+                    <div
+                      key={p.uid}
+                      className="rounded-2xl bg-black/20 border border-white/10 p-4 flex items-center justify-between gap-3"
+                    >
+                      <div>
+                        <span className="font-semibold">{p.name}</span> — Seat{" "}
+                        {p.seat ?? "-"} {p.isDealer ? "(Dealer)" : ""}
+                      </div>
+
+                      <div
+                        className={`text-xs px-2 py-1 rounded-full ${
+                          isOnline
+                            ? "bg-emerald-500/15 text-emerald-200 border border-emerald-400/30"
+                            : "bg-red-500/15 text-red-200 border border-red-400/30"
+                        }`}
+                      >
+                        {isOnline ? "Online" : "Offline"}
+                      </div>
                     </div>
-                    <div className={`text-xs px-2 py-1 rounded-full ${presence?.[p.uid]?.online ? "bg-emerald-500/15 text-emerald-200 border border-emerald-400/30" : "bg-red-500/15 text-red-200 border border-red-400/30"}`}>
-                      {presence?.[p.uid]?.online ? "Online" : "Offline"}
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
 
@@ -98,15 +134,23 @@ export default function RoomPage() {
               {!me?.isDealer ? (
                 <>
                   <div className="text-xl font-bold">Choose Seat</div>
-                  <div className="text-white/60 mt-1">Select any free seat from 1 to 11.</div>
+                  <div className="text-white/60 mt-1">
+                    Select any free seat from 1 to 11.
+                  </div>
                   <div className="mt-5">
-                    <SeatPicker seats={room?.seats} selectedSeat={me?.seat ?? null} onChoose={chooseSeat} />
+                    <SeatPicker
+                      seats={room?.seats}
+                      selectedSeat={me?.seat ?? null}
+                      onChoose={chooseSeat}
+                    />
                   </div>
                 </>
               ) : (
                 <>
                   <div className="text-xl font-bold">Dealer Seat</div>
-                  <div className="text-white/60 mt-1">Waiting for players to join and choose seats.</div>
+                  <div className="text-white/60 mt-1">
+                    Waiting for players to join and choose seats.
+                  </div>
                   <div className="mt-5 rounded-2xl p-4 bg-yellow-500/10 border border-yellow-400/20 text-yellow-100">
                     You are the Dealer • Fixed at Seat 12
                   </div>
@@ -115,14 +159,23 @@ export default function RoomPage() {
 
               <div className="flex gap-3 flex-wrap mt-8">
                 {isHost ? (
-                  <button onClick={startGame} disabled={!canStart} className="rounded-2xl bg-emerald-600 hover:bg-emerald-500 px-5 py-3.5 font-black text-lg">
+                  <button
+                    onClick={startGame}
+                    disabled={!canStart}
+                    className="rounded-2xl bg-emerald-600 hover:bg-emerald-500 px-5 py-3.5 font-black text-lg"
+                  >
                     Start Game
                   </button>
                 ) : (
-                  <div className="text-white/70 self-center">Waiting for host to start the game...</div>
+                  <div className="text-white/70 self-center">
+                    Waiting for host to start the game...
+                  </div>
                 )}
 
-                <button onClick={leaveRoom} className="rounded-2xl bg-red-700 hover:bg-red-600 px-5 py-3.5 font-black text-lg">
+                <button
+                  onClick={leaveRoom}
+                  className="rounded-2xl bg-red-700 hover:bg-red-600 px-5 py-3.5 font-black text-lg"
+                >
                   Leave Room
                 </button>
               </div>

@@ -36,13 +36,17 @@ export default function RoundTableGame({
       <div className="hidden xl:block relative min-h-[760px] rounded-[40px] table-surface felt-border border border-emerald-400/15 overflow-hidden">
         <div className="absolute inset-10 rounded-[999px] border border-yellow-400/20" />
         <div className="absolute inset-[15%] rounded-[999px] border border-white/5" />
+
         <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-center">
           <div className="gold-text text-3xl font-black">BLACKJACK TABLE</div>
           <div className="text-white/55 text-sm mt-1">Players around the table</div>
         </div>
 
         {players.map((player, index) => (
-          <div key={player.uid} className={`absolute ${positions[player.seat || 12]} w-[290px]`}>
+          <div
+            key={player.uid}
+            className={`absolute ${positions[player.seat || 12]} w-[290px]`}
+          >
             <PlayerSeat
               player={player}
               hand={hands?.[player.uid]}
@@ -50,7 +54,7 @@ export default function RoundTableGame({
               revealAll={revealAll}
               isCurrentTurn={currentTurnSeat === player.seat}
               dealBaseDelay={index * 0.16}
-              online={!!presence?.[player.uid]?.online}
+              online={player.uid === uid || !!presence?.[player.uid]?.online}
             />
           </div>
         ))}
@@ -66,7 +70,7 @@ export default function RoundTableGame({
             revealAll={revealAll}
             isCurrentTurn={currentTurnSeat === player.seat}
             dealBaseDelay={index * 0.16}
-            online={!!presence?.[player.uid]?.online}
+            online={player.uid === uid || !!presence?.[player.uid]?.online}
           />
         ))}
       </div>

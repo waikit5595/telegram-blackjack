@@ -34,6 +34,7 @@ export default function RoundTableSeats({
     <div className="relative w-full min-h-[460px] rounded-[40px] table-surface felt-border border border-emerald-400/15 overflow-hidden hidden lg:block">
       <div className="absolute inset-10 rounded-[999px] border border-yellow-400/20" />
       <div className="absolute inset-[18%] rounded-[999px] border border-white/5" />
+
       <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-center">
         <div className="gold-text text-3xl font-black">BLACKJACK</div>
         <div className="text-white/55 text-sm mt-1">Choose your seat</div>
@@ -42,7 +43,9 @@ export default function RoundTableSeats({
       {Array.from({ length: 12 }, (_, i) => i + 1).map((seat) => {
         const p = playersBySeat.get(seat);
         const isMe = p?.uid === meUid;
-        const online = p ? !!presence?.[p.uid]?.online : false;
+
+        // ✅ 自己永远显示在线
+        const online = p ? (p.uid === meUid || !!presence?.[p.uid]?.online) : false;
 
         return (
           <div
@@ -56,9 +59,11 @@ export default function RoundTableSeats({
             } p-3 text-center`}
           >
             <div className="text-xs text-white/60">Seat {seat}</div>
+
             {p ? (
               <div className="mt-1 space-y-1">
                 <div className="font-semibold truncate">{p.name}</div>
+
                 <div className="flex justify-center gap-1 flex-wrap">
                   {p.isDealer && <StatusBadge label="Dealer" tone="gold" />}
                   {!p.isDealer && isMe && <StatusBadge label="You" tone="blue" />}
