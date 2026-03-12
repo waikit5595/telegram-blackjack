@@ -1,13 +1,23 @@
 'use client';
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
+import { onAuthStateChanged } from "firebase/auth";
 import { onDisconnect, ref, remove, set } from "firebase/database";
 import { auth, db } from "@/lib/firebase";
 import { authedPostKeepalive } from "@/lib/api";
 
 export function useRoomPresence(roomCode?: string) {
+  const [uid, setUid] = useState<string | null>(auth.currentUser?.uid || null);
+
   useEffect(() => {
-    const uid = auth.currentUser?.uid;
+    const unsub = onAuthStateChanged(auth, (user) => {
+      setUid(user?.uid || null);
+    });
+
+    return () => unsub();
+  }, []);
+
+  useEffect(() => {
     if (!roomCode || !uid) return;
 
     const presenceRef = ref(db, `presence/${roomCode}/${uid}`);
@@ -37,5 +47,5 @@ export function useRoomPresence(roomCode?: string) {
       window.removeEventListener("beforeunload", onPageHide);
       remove(presenceRef).catch(() => undefined);
     };
-  }, [roomCode]);
+  }, [roomCode, uid]);
 }
