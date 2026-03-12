@@ -1,26 +1,41 @@
-import { initializeApp, cert, getApps } from "firebase-admin/app";
-import { getDatabase } from "firebase-admin/database";
-import { getAuth } from "firebase-admin/auth";
+import { getApps, initializeApp, cert, App } from "firebase-admin/app";
+import { getAuth, Auth } from "firebase-admin/auth";
+import { getDatabase, Database } from "firebase-admin/database";
 
-const projectId = process.env.FIREBASE_PROJECT_ID;
-const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
-const privateKey = process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, "\n");
+let app: App;
+let adminAuth: Auth;
+let adminDb: Database;
 
-if (!projectId || !clientEmail || !privateKey) {
-  throw new Error("Missing Firebase Admin environment variables.");
+function getEnv(name: string) {
+  const value = process.env[name];
+  if (!value || !value.trim()) {
+    throw new Error(`Missing environment variable: ${name}`);
+  }
+  return value;
 }
 
-const adminApp =
-  getApps().length === 0
-    ? initializeApp({
-        credential: cert({
-          projectId,
-          clientEmail,
-          privateKey,
-        }),
-        databaseURL: process.env.FIREBASE_DATABASE_URL,
-      })
-    : getApps()[0];
+function getAdminApp() {
+  if (getApps().length > 0) {
+    return getApps()[0]!;
+  }
 
-export const adminDb = getDatabase(adminApp);
-export const adminAuth = getAuth(adminApp);
+  const projectId = getEnv("FIREBASE_PROJECT_ID");
+  const clientEmail = getEnv("FIREBASE_CLIENT_EMAIL");
+  const privateKey = getEnv("FIREBASE_PRIVATE_KEY").replace(/\\n/g, "\n");
+  const databaseURL = getEnv("FIREBASE_DATABASE_URL");
+
+  return initializeApp({
+    credential: cert({
+      projectId,
+      clientEmail,
+      privateKey,
+    }),
+    databaseURL,
+  });
+}
+
+app = getAdminApp();
+adminAuth = getAuth(app);
+adminDb = getDatabase(app);
+
+export { adminAuth, adminDb };
